@@ -1,8 +1,8 @@
-type Element = string | () -> string -- Elements are either raw strings or functions that return strings
-type ComponentResult = () -> Element -- Component results are functions that return Elements
-type WrappedComponent = () -> ComponentResult -- Wrapped components are when a component is called without children
-type Child = Element | ComponentResult | WrappedComponent
-type Component<T> = (props: T) -> (children: { Child }?) -> ComponentResult
+export type Node = string | () -> string -- Nodes are what user defined functions return
+type Element = () -> string -- Elements are what Components return
+type ChildlessElement = () -> Element -- ChildlessElements are when a component is called without children
+type Child = string | Element | ChildlessElement
+type Component<T> = (props: T) -> (children: { Child }?) -> Element
 
 local function escapeHtml(attribute: string): string
 	attribute = string.gsub(attribute, "&", "&amp;")
@@ -32,15 +32,15 @@ local boldText = Text({ bold = true }) {
 print(boldText()) -- <strong>Hello World</strong>
 ]]
 --
-local function createComponent<T>(component: (props: T, children: { string }?) -> Element): Component<T>
+local function createComponent<T>(component: (props: T, children: { string }?) -> Node): Component<T>
 	return function(props: T)
 		return function(children: { Child }?)
-			-- Turn the Child array into a string array. Child may be an Element or unwrapped Element.
+			-- Turn the Child array into a string array. Child may be an Element or Childless Element.
 			local stringChildren: { string }?
 			if children then
 				stringChildren = {}
 				for i, child in children do
-					if typeof(child) == "function" then -- Is an Element or unwrapped Element
+					if typeof(child) == "function" then -- Is an Element or Childless Element
 						-- Child may still be a function, this is when children haven't been passed:
 						-- Component(props) {
 						--   OtherComponent(), <-- OtherComponent to be unwrapped twice! Once to get the Element and once to get the string
@@ -48,9 +48,6 @@ local function createComponent<T>(component: (props: T, children: { string }?) -
 						local wrappedElement = child()
 						if typeof(wrappedElement) == "function" then
 							wrappedElement = wrappedElement()
-							if typeof(wrappedElement) == "function" then
-								wrappedElement = wrappedElement()
-							end
 						end
 						stringChildren[i] = wrappedElement
 					else
@@ -62,7 +59,12 @@ local function createComponent<T>(component: (props: T, children: { string }?) -
 
 			-- Return final Element
 			return function()
-				return component(props, stringChildren)
+				local result = component(props, stringChildren)
+        if typeof(result) == "function" then
+          return result()
+        else
+          return result
+        end
 			end
 		end
 	end
