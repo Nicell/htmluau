@@ -1,6 +1,8 @@
-type Element = string | () -> string
-type Child = Element | () -> Element | () -> () -> Element
-type Component<T> = (props: T) -> (children: { Child }?) -> () -> Element
+type Element = string | () -> string -- Elements are either raw strings or functions that return strings
+type ComponentResult = () -> Element -- Component results are functions that return Elements
+type WrappedComponent = () -> ComponentResult -- Wrapped components are when a component is called without children
+type Child = Element | ComponentResult | WrappedComponent
+type Component<T> = (props: T) -> (children: { Child }?) -> ComponentResult
 
 local function escapeHtml(attribute: string): string
 	attribute = string.gsub(attribute, "&", "&amp;")
@@ -46,11 +48,11 @@ local function createComponent<T>(component: (props: T, children: { string }?) -
 						local wrappedElement = child()
 						if typeof(wrappedElement) == "function" then
 							wrappedElement = wrappedElement()
-              if typeof(wrappedElement) == "function" then
-                wrappedElement = wrappedElement()
-              end
+							if typeof(wrappedElement) == "function" then
+								wrappedElement = wrappedElement()
+							end
 						end
-            stringChildren[i] = wrappedElement
+						stringChildren[i] = wrappedElement
 					else
 						-- Any raw strings passed in as children are escaped.
 						stringChildren[i] = escapeHtml(child)
