@@ -1,129 +1,148 @@
-type Children = { string | () -> string }
-type Component<T> = (props: T) -> (children: Children) -> string
+type Element = () -> string
+type Child = string | Element | () -> Element
+type Component<T> = (props: T) -> (children: { Child }?) -> Element
 
-local function createComponent<T>(component: (props: T, children: Children) -> string): Component<T>
-  return function(props: T): (children: Children) -> string
-    return function(children: Children): string
-      return component(props, children)
-    end
-  end
+local function escapeHtml(attribute: string): string
+	attribute = string.gsub(attribute, "&", "&amp;")
+	attribute = string.gsub(attribute, "<", "&lt;")
+	attribute = string.gsub(attribute, ">", "&gt;")
+	attribute = string.gsub(attribute, "'", "&apos;")
+	attribute = string.gsub(attribute, '"', "&quot;")
+	return attribute
 end
 
-local function escapeAttribute(attribute: string): string
-  attribute = string.gsub(attribute, "&", "&amp;")
-  attribute = string.gsub(attribute, '"', "&quot;")
-  return attribute
+local function createComponent<T>(component: (props: T, children: { string }?) -> string): Component<T>
+	return function(props: T)
+		return function(children: { Child }?)
+			local stringChildren: { string }?
+      if children then
+        stringChildren = {}
+        for i, child in children do
+          if typeof(child) == "function" then
+            local possiblyFunction = child()
+            if typeof(possiblyFunction) == "function" then
+              stringChildren[i] = possiblyFunction()
+            else
+              stringChildren[i] = possiblyFunction
+            end
+          else
+            stringChildren[i] = escapeHtml(child)
+          end
+        end
+      end
+			return function(): string
+				return component(props, stringChildren)
+			end
+		end
+	end
 end
 
-local function createElement(tag: string): Component<any?>
-  return function(props: any?)
-    return function(children: Children): string
-      local attributes = ""
-      if props then
-        for key, value in props do
-          attributes ..= ` {key}="{escapeAttribute(value)}"`
-        end
-      end
+local function createHtmlElement(tag: string)
+	local function htmlElement(props: { [string]: string }?, children: { string }?)
+		local attributes = ""
+		if props then
+			for key, value in props do
+				attributes ..= ` {key}="{escapeHtml(value)}"`
+			end
+		end
 
-      for i, child in children do
-        if type(child) == "function" then
-          children[i] = child()
-        end
-      end
-      local contents = table.concat(children, "\n")
+		if children then
+			return `<{tag}{attributes}>{table.concat(children, "\n")}</{tag}>`
+		else
+			return `<{tag}{attributes}></{tag}>`
+		end
+	end
 
-      return `<{tag}{attributes}>{contents}</{tag}>`
-    end
-  end
+	return createComponent(htmlElement)
 end
 
 return {
-  createComponent = createComponent,
+	createComponent = createComponent,
 
-  div = createElement("div"),
-  span = createElement("span"),
-  h1 = createElement("h1"),
-  h2 = createElement("h2"),
-  h3 = createElement("h3"),
-  h4 = createElement("h4"),
-  h5 = createElement("h5"),
-  h6 = createElement("h6"),
-  p = createElement("p"),
-  a = createElement("a"),
-  img = createElement("img"),
-  button = createElement("button"),
-  input = createElement("input"),
-  label = createElement("label"),
-  textarea = createElement("textarea"),
-  select = createElement("select"),
-  option = createElement("option"),
-  ul = createElement("ul"),
-  ol = createElement("ol"),
-  li = createElement("li"),
-  table = createElement("table"),
-  tr = createElement("tr"),
-  td = createElement("td"),
-  th = createElement("th"),
-  thead = createElement("thead"),
-  tbody = createElement("tbody"),
-  tfoot = createElement("tfoot"),
-  form = createElement("form"),
-  br = createElement("br"),
-  hr = createElement("hr"),
-  strong = createElement("strong"),
-  b = createElement("b"),
-  em = createElement("em"),
-  i = createElement("i"),
-  u = createElement("u"),
-  s = createElement("s"),
-  sup = createElement("sup"),
-  sub = createElement("sub"),
-  small = createElement("small"),
-  code = createElement("code"),
-  pre = createElement("pre"),
-  blockquote = createElement("blockquote"),
-  nav = createElement("nav"),
-  header = createElement("header"),
-  footer = createElement("footer"),
-  section = createElement("section"),
-  article = createElement("article"),
-  aside = createElement("aside"),
-  main = createElement("main"),
-  details = createElement("details"),
-  summary = createElement("summary"),
-  dialog = createElement("dialog"),
-  time = createElement("time"),
-  address = createElement("address"),
-  mark = createElement("mark"),
-  progress = createElement("progress"),
-  meter = createElement("meter"),
-  caption = createElement("caption"),
-  figure = createElement("figure"),
-  figcaption = createElement("figcaption"),
-  legend = createElement("legend"),
-  fieldset = createElement("fieldset"),
-  dfn = createElement("dfn"),
-  kbd = createElement("kbd"),
-  var = createElement("var"),
-  cite = createElement("cite"),
-  q = createElement("q"),
+	div = createHtmlElement("div"),
+	span = createHtmlElement("span"),
+	h1 = createHtmlElement("h1"),
+	h2 = createHtmlElement("h2"),
+	h3 = createHtmlElement("h3"),
+	h4 = createHtmlElement("h4"),
+	h5 = createHtmlElement("h5"),
+	h6 = createHtmlElement("h6"),
+	p = createHtmlElement("p"),
+	a = createHtmlElement("a"),
+	img = createHtmlElement("img"),
+	button = createHtmlElement("button"),
+	input = createHtmlElement("input"),
+	label = createHtmlElement("label"),
+	textarea = createHtmlElement("textarea"),
+	select = createHtmlElement("select"),
+	option = createHtmlElement("option"),
+	ul = createHtmlElement("ul"),
+	ol = createHtmlElement("ol"),
+	li = createHtmlElement("li"),
+	table = createHtmlElement("table"),
+	tr = createHtmlElement("tr"),
+	td = createHtmlElement("td"),
+	th = createHtmlElement("th"),
+	thead = createHtmlElement("thead"),
+	tbody = createHtmlElement("tbody"),
+	tfoot = createHtmlElement("tfoot"),
+	form = createHtmlElement("form"),
+	br = createHtmlElement("br"),
+	hr = createHtmlElement("hr"),
+	strong = createHtmlElement("strong"),
+	b = createHtmlElement("b"),
+	em = createHtmlElement("em"),
+	i = createHtmlElement("i"),
+	u = createHtmlElement("u"),
+	s = createHtmlElement("s"),
+	sup = createHtmlElement("sup"),
+	sub = createHtmlElement("sub"),
+	small = createHtmlElement("small"),
+	code = createHtmlElement("code"),
+	pre = createHtmlElement("pre"),
+	blockquote = createHtmlElement("blockquote"),
+	nav = createHtmlElement("nav"),
+	header = createHtmlElement("header"),
+	footer = createHtmlElement("footer"),
+	section = createHtmlElement("section"),
+	article = createHtmlElement("article"),
+	aside = createHtmlElement("aside"),
+	main = createHtmlElement("main"),
+	details = createHtmlElement("details"),
+	summary = createHtmlElement("summary"),
+	dialog = createHtmlElement("dialog"),
+	time = createHtmlElement("time"),
+	address = createHtmlElement("address"),
+	mark = createHtmlElement("mark"),
+	progress = createHtmlElement("progress"),
+	meter = createHtmlElement("meter"),
+	caption = createHtmlElement("caption"),
+	figure = createHtmlElement("figure"),
+	figcaption = createHtmlElement("figcaption"),
+	legend = createHtmlElement("legend"),
+	fieldset = createHtmlElement("fieldset"),
+	dfn = createHtmlElement("dfn"),
+	kbd = createHtmlElement("kbd"),
+	var = createHtmlElement("var"),
+	cite = createHtmlElement("cite"),
+	q = createHtmlElement("q"),
 
-  html = createElement("html"),
-  head = createElement("head"),
-  title = createElement("title"),
-  meta = createElement("meta"),
-  link = createElement("link"),
-  style = createElement("style"),
-  body = createElement("body"),
+	html = createHtmlElement("html"),
+	head = createHtmlElement("head"),
+	title = createHtmlElement("title"),
+	meta = createHtmlElement("meta"),
+	link = createHtmlElement("link"),
+	style = createHtmlElement("style"),
+	body = createHtmlElement("body"),
 
-  script = createElement("script"),
-  noscript = createElement("noscript"),
+	script = createHtmlElement("script"),
+	noscript = createHtmlElement("noscript"),
 
-  audio = createElement("audio"),
-  video = createElement("video"),
-  source = createElement("source"),
-  track = createElement("track"),
-  iframe = createElement("iframe"),
-  canvas = createElement("canvas"),
-  svg = createElement("svg"),
+	audio = createHtmlElement("audio"),
+	video = createHtmlElement("video"),
+	source = createHtmlElement("source"),
+	track = createHtmlElement("track"),
+	iframe = createHtmlElement("iframe"),
+	canvas = createHtmlElement("canvas"),
+	svg = createHtmlElement("svg"),
 }

@@ -1,9 +1,16 @@
-# HTMLuau
+local net = require("@lute/net")
 
-Simple HTML templating in Luau.
+local htmluau = require("../src")
 
-```luau
-html({ lang = "en" }) {
+local html = htmluau.html
+local head = htmluau.head
+local title = htmluau.title
+local body = htmluau.body
+local h1 = htmluau.h1
+local button = htmluau.button
+local p = htmluau.p
+
+local website = html({ lang = "en" }) {
 	head() {
 		title() {
 			"Hello World",
@@ -25,4 +32,7 @@ html({ lang = "en" }) {
 		button(),
 	},
 }
-```
+
+net.serve(function()
+	return website()
+end)
