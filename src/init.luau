@@ -11,26 +11,52 @@ local function escapeHtml(attribute: string): string
 	return attribute
 end
 
+--[[
+Wraps a two-argument function into a "component" nested function.
+
+local Text = createComponent(function(props: { bold: boolean }, children)
+  local constents = table.concat(children, "\n")
+  if props.bold then
+    return `<strong>{contents}</strong>`
+  else
+    return contents
+  end
+end)
+
+local boldText = Text({ bold = true }) {
+  "Hello World",
+}
+
+print(boldText()) -- <strong>Hello World</strong>
+]]--
 local function createComponent<T>(component: (props: T, children: { string }?) -> string): Component<T>
 	return function(props: T)
 		return function(children: { Child }?)
+      -- Turn the Child array into a string array. Child may be an Element or unwrapped Element.
 			local stringChildren: { string }?
       if children then
         stringChildren = {}
         for i, child in children do
-          if typeof(child) == "function" then
-            local possiblyFunction = child()
-            if typeof(possiblyFunction) == "function" then
-              stringChildren[i] = possiblyFunction()
+          if typeof(child) == "function" then -- Is an Element or unwrapped Element
+            -- Child may still be a function, this is when children haven't been passed:
+            -- Component(props) {
+            --   OtherComponent(), <-- OtherComponent to be unwrapped twice! Once to get the Element and once to get the string
+            -- }
+            local wrappedElement = child()
+            if typeof(wrappedElement) == "function" then
+              stringChildren[i] = wrappedElement()
             else
-              stringChildren[i] = possiblyFunction
+              stringChildren[i] = wrappedElement
             end
           else
+            -- Any raw strings passed in as children are escaped.
             stringChildren[i] = escapeHtml(child)
           end
         end
       end
-			return function(): string
+
+      -- Return final Element
+			return function()
 				return component(props, stringChildren)
 			end
 		end
