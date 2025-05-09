@@ -16,10 +16,12 @@ end
 --[[
 Wraps a two-argument function into a "component" nested function.
 
-local Text = createComponent(function(props: { bold: boolean }, children)
-  local constents = table.concat(children, "\n")
+local Text = createComponent(function(props: { bold: boolean }, children: { string }?)
+  local contents = table.concat(children, "\n")
   if props.bold then
-    return `<strong>{contents}</strong>`
+    return strong() {
+      contents
+    }
   else
     return contents
   end
