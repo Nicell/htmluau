@@ -1,6 +1,6 @@
-type Element = () -> string
-type Child = string | Element | () -> Element
-type Component<T> = (props: T) -> (children: { Child }?) -> Element
+type Element = string | () -> string
+type Child = Element | () -> Element | () -> () -> Element
+type Component<T> = (props: T) -> (children: { Child }?) -> () -> Element
 
 local function escapeHtml(attribute: string): string
 	attribute = string.gsub(attribute, "&", "&amp;")
@@ -28,34 +28,37 @@ local boldText = Text({ bold = true }) {
 }
 
 print(boldText()) -- <strong>Hello World</strong>
-]]--
-local function createComponent<T>(component: (props: T, children: { string }?) -> string): Component<T>
+]]
+--
+local function createComponent<T>(component: (props: T, children: { string }?) -> Element): Component<T>
 	return function(props: T)
 		return function(children: { Child }?)
-      -- Turn the Child array into a string array. Child may be an Element or unwrapped Element.
+			-- Turn the Child array into a string array. Child may be an Element or unwrapped Element.
 			local stringChildren: { string }?
-      if children then
-        stringChildren = {}
-        for i, child in children do
-          if typeof(child) == "function" then -- Is an Element or unwrapped Element
-            -- Child may still be a function, this is when children haven't been passed:
-            -- Component(props) {
-            --   OtherComponent(), <-- OtherComponent to be unwrapped twice! Once to get the Element and once to get the string
-            -- }
-            local wrappedElement = child()
-            if typeof(wrappedElement) == "function" then
-              stringChildren[i] = wrappedElement()
-            else
-              stringChildren[i] = wrappedElement
-            end
-          else
-            -- Any raw strings passed in as children are escaped.
-            stringChildren[i] = escapeHtml(child)
-          end
-        end
-      end
+			if children then
+				stringChildren = {}
+				for i, child in children do
+					if typeof(child) == "function" then -- Is an Element or unwrapped Element
+						-- Child may still be a function, this is when children haven't been passed:
+						-- Component(props) {
+						--   OtherComponent(), <-- OtherComponent to be unwrapped twice! Once to get the Element and once to get the string
+						-- }
+						local wrappedElement = child()
+						if typeof(wrappedElement) == "function" then
+							wrappedElement = wrappedElement()
+              if typeof(wrappedElement) == "function" then
+                wrappedElement = wrappedElement()
+              end
+						end
+            stringChildren[i] = wrappedElement
+					else
+						-- Any raw strings passed in as children are escaped.
+						stringChildren[i] = escapeHtml(child)
+					end
+				end
+			end
 
-      -- Return final Element
+			-- Return final Element
 			return function()
 				return component(props, stringChildren)
 			end
