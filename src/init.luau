@@ -62,11 +62,11 @@ local function createComponent<T>(component: (props: T, children: { string }?) -
 			-- Return final Element
 			return function()
 				local result = component(props, stringChildren)
-        if typeof(result) == "function" then
-          return result()
-        else
-          return result
-        end
+				if typeof(result) == "function" then
+					return result()
+				else
+					return result
+				end
 			end
 		end
 	end
