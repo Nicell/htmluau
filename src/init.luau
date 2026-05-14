@@ -1,14 +1,8 @@
 export type Element = () -> string -- Elements are what Components return
 export type Node = string | Element -- Nodes are what user defined functions return
-export type Child = string | Element | ChildElement
-export type ChildElement =
-	((children: { string }?) -> Element)
-	& ((children: { Element }?) -> Element)
-	& ((children: { ChildElement }?) -> Element)
-	& ((children: { string | Element }?) -> Element)
-	& ((children: { string | ChildElement }?) -> Element)
-	& ((children: { Element | ChildElement }?) -> Element)
-	& ((children: { Child }?) -> Element)
+export type ElementList = { Element }
+export type Child = string | Element | ChildElement | ElementList
+export type ChildElement = <T>(children: { T }?) -> Element
 export type Component<T> = (props: T) -> ChildElement
 
 local function escapeHtml(attribute: string): string
@@ -20,9 +14,41 @@ local function escapeHtml(attribute: string): string
 	return attribute
 end
 
+local renderChild: (Child, { string }) -> ()
+
+local function renderChildren(children: { Child }, stringChildren: { string })
+	for _, child in children do
+		renderChild(child, stringChildren)
+	end
+end
+
+renderChild = function(child: Child, stringChildren: { string })
+	if typeof(child) == "function" then -- Is an Element or a component with omitted children.
+		local render = child :: () -> Node
+		local rendered = render()
+		if typeof(rendered) == "function" then
+			table.insert(stringChildren, rendered())
+		else
+			table.insert(stringChildren, rendered)
+		end
+	elseif typeof(child) == "table" then
+		for _, nestedChild in child :: { Element | string } do
+			if typeof(nestedChild) == "string" then
+				table.insert(stringChildren, nestedChild)
+			else
+				renderChild(nestedChild, stringChildren)
+			end
+		end
+	else
+		-- Any raw strings passed in as children are escaped.
+		table.insert(stringChildren, escapeHtml(child))
+	end
+end
+
 --[[
 Wraps a two-argument function into a "component" nested function.
 
+```luau
 local Text = createComponent(function(props: { bold: boolean }, children: { string }?)
   local contents = table.concat(children, "\n")
   if props.bold then
@@ -39,23 +65,8 @@ local boldText = Text({ bold = true }) {
 }
 
 print(boldText()) -- <strong>Hello World</strong>
+```
 ]]
---
-local function renderChild(child: Child): string
-	if typeof(child) == "function" then -- Is an Element or a component with omitted children.
-		local render = child :: () -> Node
-		local rendered = render()
-		if typeof(rendered) == "function" then
-			return rendered()
-		else
-			return rendered
-		end
-	else
-		-- Any raw strings passed in as children are escaped.
-		return escapeHtml(child)
-	end
-end
-
 local function createComponent<T>(component: (props: T, children: { string }?) -> Node): Component<T>
 	return function(props: T)
 		local childElement = function(children: { Child }?)
@@ -63,9 +74,7 @@ local function createComponent<T>(component: (props: T, children: { string }?) -
 			local stringChildren: { string }?
 			if children then
 				stringChildren = {}
-				for i, child in children do
-					stringChildren[i] = renderChild(child)
-				end
+				renderChildren(children, stringChildren)
 			end
 
 			-- Return final Element
@@ -102,8 +111,34 @@ local function createHtmlElement(tag: string)
 	return createComponent(htmlElement)
 end
 
+--[[
+Maps a table into an element list that can be passed directly as children.
+
+```luau
+local items = { "First", "Second" }
+
+local list = ul() {
+  map(items, function(item, index)
+    return li({ ["data-index"] = tostring(index) }) {
+      item,
+    }
+  end),
+}
+
+print(list()) -- <ul><li data-index="1">First</li>\n<li data-index="2">Second</li></ul>
+```
+]]
+local function map<K, V>(items: { [K]: V }, callback: (V, K) -> Element): ElementList
+	local children: ElementList = {}
+	for key, value in items do
+		table.insert(children, callback(value, key))
+	end
+	return children
+end
+
 return {
 	createComponent = createComponent,
+	map = map,
 
 	div = createHtmlElement("div"),
 	span = createHtmlElement("span"),

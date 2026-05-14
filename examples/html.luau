@@ -1,4 +1,4 @@
-local net = require("@lute/net")
+local net = require("@lute/net/server")
 
 local htmluau = require("../src")
 
