@@ -1,8 +1,15 @@
-export type Node = string | () -> string -- Nodes are what user defined functions return
-type Element = () -> string -- Elements are what Components return
-type ChildlessElement = () -> Element -- ChildlessElements are when a component is called without children
-type Child = string | Element | ChildlessElement
-type Component<T> = (props: T) -> (children: { Child }?) -> Element
+export type Element = () -> string -- Elements are what Components return
+export type Node = string | Element -- Nodes are what user defined functions return
+export type Child = string | Element | ChildElement
+export type ChildElement =
+	((children: { string }?) -> Element)
+	& ((children: { Element }?) -> Element)
+	& ((children: { ChildElement }?) -> Element)
+	& ((children: { string | Element }?) -> Element)
+	& ((children: { string | ChildElement }?) -> Element)
+	& ((children: { Element | ChildElement }?) -> Element)
+	& ((children: { Child }?) -> Element)
+export type Component<T> = (props: T) -> ChildElement
 
 local function escapeHtml(attribute: string): string
 	attribute = string.gsub(attribute, "&", "&amp;")
@@ -34,28 +41,30 @@ local boldText = Text({ bold = true }) {
 print(boldText()) -- <strong>Hello World</strong>
 ]]
 --
+local function renderChild(child: Child): string
+	if typeof(child) == "function" then -- Is an Element or a component with omitted children.
+		local render = child :: () -> Node
+		local rendered = render()
+		if typeof(rendered) == "function" then
+			return rendered()
+		else
+			return rendered
+		end
+	else
+		-- Any raw strings passed in as children are escaped.
+		return escapeHtml(child)
+	end
+end
+
 local function createComponent<T>(component: (props: T, children: { string }?) -> Node): Component<T>
 	return function(props: T)
-		return function(children: { Child }?)
+		local childElement = function(children: { Child }?)
 			-- Turn the Child array into a string array. Child may be an Element or Childless Element.
 			local stringChildren: { string }?
 			if children then
 				stringChildren = {}
 				for i, child in children do
-					if typeof(child) == "function" then -- Is an Element or Childless Element
-						-- Child may still be a function, this is when children haven't been passed:
-						-- Component(props) {
-						--   OtherComponent(), <-- OtherComponent to be unwrapped twice! Once to get the Element and once to get the string
-						-- }
-						local wrappedElement = child()
-						if typeof(wrappedElement) == "function" then
-							wrappedElement = wrappedElement()
-						end
-						stringChildren[i] = wrappedElement
-					else
-						-- Any raw strings passed in as children are escaped.
-						stringChildren[i] = escapeHtml(child)
-					end
+					stringChildren[i] = renderChild(child)
 				end
 			end
 
@@ -69,6 +78,8 @@ local function createComponent<T>(component: (props: T, children: { string }?) -
 				end
 			end
 		end
+
+		return childElement :: ChildElement
 	end
 end
 
